@@ -33,5 +33,10 @@ namespace FirstWebAPIProject.Models
         public virtual Category? Category { get; set; }
     }
 
+    public static class CacheKeys
+    {
+        public static string Products => "_Products";
+    }
+
 }
 

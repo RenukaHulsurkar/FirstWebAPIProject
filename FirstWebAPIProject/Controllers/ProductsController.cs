@@ -1,7 +1,9 @@
-﻿using FirstWebAPIProject.Models;
+﻿using FirstWebAPIProject.Interfaces;
+using FirstWebAPIProject.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
@@ -18,11 +20,16 @@ namespace FirstWebAPIProject.Controllers
 
         public ILogger<ProductsController> _logger;
 
-        public ProductsController(ShopContext context, ILogger<ProductsController> logger)
+        private ICacheProvider _cacheProvider;
+        private  IMemoryCache _cache;
+
+        public ProductsController(ShopContext context, ILogger<ProductsController> logger, ICacheProvider cacheProvider,IMemoryCache memoryCache)
         {
             _context = context;
             _context.Database.EnsureCreated();
             _logger = logger;
+            _cacheProvider = cacheProvider;
+            _cache = memoryCache;
         }
 
         [HttpGet("{id}")] //[HttpGet, Route("/products/{id}")]
@@ -92,10 +99,12 @@ namespace FirstWebAPIProject.Controllers
 
         }
 
-        [HttpDelete("{id}")]        
+        [HttpDelete("{id}")]
         public async Task<ActionResult<Products>> DeleteProduct(int id)
         {
             var product = await _context.Products.FindAsync(id);
+
+            var p1 = await _context.Products.MaxAsync(a => a.Price);
 
             if (product == null)
             {
@@ -116,7 +125,6 @@ namespace FirstWebAPIProject.Controllers
             foreach (var id in ids)
             {
                 var product = await _context.Products.FindAsync(id);
-
                 if (product == null)
                 {
                     return NotFound();
@@ -129,6 +137,40 @@ namespace FirstWebAPIProject.Controllers
             await _context.SaveChangesAsync();
 
             return Ok(products);
+        }
+
+        [HttpGet]
+        [Route("getAllproducts")]
+        public IActionResult GetAllproducts()
+        {
+            //if (! _cache.TryGetValue(CacheKeys.Products, out List<Products> employees))
+            //{
+            //    employees = _context.Products.ToList();  //GetEmployeesDeatilsFromDB(); // Get the data from database
+
+            //    var cacheEntryOptions = new MemoryCacheEntryOptions
+            //    {
+            //        AbsoluteExpiration = DateTime.Now.AddMinutes(5),
+            //        SlidingExpiration = TimeSpan.FromMinutes(2),
+            //        Size = 1024,
+            //    };  
+            //    _cache.Set(CacheKeys.Products, employees, cacheEntryOptions);
+            //}
+            //return Ok(employees);
+
+            try
+            {
+                var employees = _cacheProvider.GetCachedResponse().Result;
+                return Ok(employees);
+            }
+            catch (Exception ex)
+            {
+                return new ContentResult()
+                {
+                    StatusCode = 500,
+                    Content = "{ \n error : " + ex.Message + "}",
+                    ContentType = "application/json"
+                };
+            }
         }
     }
 }
